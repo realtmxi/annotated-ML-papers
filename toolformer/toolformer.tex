@@ -1,0 +1,164 @@
+\documentclass[12pt]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[dvipsnames]{xcolor}
+\usepackage[margin=1in]{geometry}
+\usepackage{palatino, amsmath, amssymb, amsfonts, hyperref, amsthm, bbm, cancel}
+\usepackage[breakable]{tcolorbox}
+\usepackage[linesnumbered,lined,boxed,commentsnumbered, ruled]{algorithm2e}
+\usepackage{xcolor, graphicx}
+\usepackage{xifthen}
+\usepackage[shortlabels]{enumitem}
+\usepackage[parfill]{parskip}
+\usepackage{hyperref}
+\usepackage[cal=pxtx]{mathalfa}
+\usepackage{fancyhdr} 
+\usepackage{url}
+\setlength\parindent{0pt}
+\usepackage{tikz}
+\usetikzlibrary{positioning}
+\hypersetup{
+    colorlinks=true,
+    linkcolor=blue,
+    filecolor=magenta,      
+    urlcolor=cyan,
+}
+\newcommand{\pink}[1]{{\color{Magenta} #1}}
+\newcommand{\gray}[1]{{\color{Gray} #1}}
+\newcommand{\red}[1]{{\color{red} #1}}
+\newcommand{\todo}[1]{{\color{red} TODO: #1}}
+\renewcommand{\comment}[1]{{\color{Blue} Comment:  #1}}
+\newcommand{\inabox}[1]{\begin{tcolorbox}[parbox=false, colback=White, breakable] #1 \end{tcolorbox}}
+
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\N}{\mathbb{N}}
+\newcommand{\p}{\mathbb{P}}
+\renewcommand{\subset}{\subseteq}
+
+\pagestyle{fancyplain}
+\lhead{\fancyplain{}{Murphy Tian}}
+% Right side of header. First page empty (as above).
+\rhead{\fancyplain{}{Toolformer Summary}}
+\setlist[enumerate,1]{a.)} % Level 1, 2 enumerate styles
+\setlist[enumerate,2]{i.)}
+%\setlist[itemize,1]{$\cdot$} % Small dot
+
+\newcommand{\SOLUTION}{}
+\newcommand{\solution}[1]{
+    \ifdefined\SOLUTION
+        \newpage
+        \textbf{#1.} 
+    \else
+    \fi
+}
+
+\newcommand{\handout}[1]{
+    \ifdefined\SOLUTION
+        #1
+    \else
+    \fi
+}
+\newtheorem{theorem}{Theorem}
+
+
+% Counter for Questions
+\newcounter{question}
+
+% Question
+\newcommand{\question}[2]{%
+	\stepcounter{question}
+	\vspace{.25in} \textbf{Q\arabic{question} 
+		\ifthenelse{\isempty{#1}}%
+		{}% if no points
+		{[#1 Points]\ }% if #1 is not empty
+		#2}\vspace{0.10in}
+}
+
+% Subquestion
+\newcommand{\qpart}[2]{%
+	\vspace{.10in} \textbf{(#1)}
+	\ifthenelse{\isempty{#2}}%
+	{}% if no points
+	{[#2 Points]}% if #1 is not empty
+}
+
+\newcommand{\references}{\vspace{.25in}\textbf{References}\vspace{.10in}}
+
+% Solution to question
+\newcommand{\sol}{\vspace{.25in}\textbf{Solution}\vspace{.10in}}
+
+% Solution to subquestion
+\newcommand{\solpart}[1] {\vspace{.10in}\textbf{(#1)}}
+
+% Should the solutions be displayed?
+\newif\ifsolutions
+\solutionstrue
+
+% Should the marking scheme be displayed?
+\newif\ifmarkingscheme
+\markingschemefalse
+
+% Math commands
+\newcommand{\set}[1]{\{#1\}}
+\newcommand{\floor}[1]{\lfloor#1\rfloor}
+\newcommand{\ceil}[1]{\lceil#1\rceil}
+\DeclareMathOperator*{\argmin}{arg\,min}
+\DeclareMathOperator*{\argmax}{arg\,max}
+
+\usepackage[linesnumbered,lined,boxed,commentsnumbered, ruled]{algorithm2e}
+\usepackage{algorithm2e}
+
+
+\begin{document}
+\section*{Toolformer Summary}
+Toolformer is aiming to call external APIs in a self-supervised way on LLM.
+
+Given an API call, $$c = (a_c, i_c)$$
+where $a_c :=$ the name of the API call, $i_c:=$ the corresponding input, $r_c :=$ the corresponding result of the API call.
+Then, we have a linearity, that is
+\begin{align*}
+	e(c) &:= \langle\text{API}\rangle \  a_c(i_c)  \ \langle/ \text{API}\rangle \\
+	e(c, r) &:= \langle\text{API}\rangle \  a_c(i_c)  \rightarrow \ r\langle/ \text{API}\rangle
+\end{align*}
+where $\langle\text{API}\rangle$ stands for the start tokenizer, $\langle / \text{API}\rangle$ stands for the end tokenizer.
+
+
+Given a dataset $\mathcal{C} = \{x^1, ..., x^{|\mathcal{C}|}\}$ of sequence plain texts, we would convert the datasets into an augmented dataset $\mathcal{C}^*$ by API calls in the upcoming ways. 
+\subsection*{I. Sampling Step}
+Denote that P(x) as a prompt encouraging the language model to annotate with API calls.
+Given an input $x = x_1, ..., x_n$
+Define that
+\begin{equation*}
+	p_i := p_M (\langle API \rangle | P(x), x_{1:i-1})
+\end{equation*}
+where $P_M(z_{n+1 | z_1, ..., z_n})$ be the probability of M assigned to $z_{n+1}$.
+
+Then, we set a sampling threshold $\tau_s$ s.t.  all positions $I = \{i \mid p_i > \tau_s\}$.
+
+In other words, if the first k candidate positions for the API calls probability hitting the threshold, we would remain computing; Otherwise, we would throw it out.
+
+\subsection*{II. Executing Step}
+we execute the API calls generated from M to get corresponding executing results r.
+
+\subsection*{III. Filtering Step}
+To filter out, we compute the cross entropy loss for M over given tokens
+\begin{align*}
+L_i(z) &:= - \sum_{j=1}^{n} w_{j-1} \cdot \log p_M (x_j \mid z, x_{1: j-1})\\
+L_i^+&:= L_i(e(c_i, r_i))	\\
+L_i^- &:= \min (L_i(\epsilon), L_i(e(c_i, \epsilon)))
+\end{align*}
+where $\epsilon$ denotes the empty sequence.\\
+And we set another threshold filtering threshold $\tau_f$ s.t. $L_i^-  L_i^+ \geq \tau_f$.
+\subsection*{IV. Finetuning Step}
+We merge the remaining API calls and insert into original input sequence $x = x_1, \cdots, x_n$, then, we construct a new sequence $x^* := x_{1:i-1}, e(c_i, r_i), x_{i:n}$. \\
+Iteratively finetune augmented dataset $\mathcal{C}^*$
+ interleave them with the new dataset. As API calls inserted in exactly positions, enabling the LM to decide when and how to use which external tool.
+ 
+\subsection*{V. Inference Step}
+Generating text after IV finetuning step, decoding until M produce the $\rightarrow$ token, then call API to get the response.
+
+\subsection*{External Tools}
+Toolformer used question ansering, calculator, Wikipedia Search, Machine Translation and Calendar external APIs. Compared with GPT model, whatever Toolformer API calls disabled or not, Toolformer usually has a better performance, one potential reason that is because the model is finetuned on many API calls and their results, improving its own capabilities.
+
+\subsection*{Conclusion}
+Labeling dataset by human need considerable cost, thus, we try to use self-supervised learning ways to save the computation cost. Nonetheless, toolformer is not an artificial intelligence that could learned by itself as I expected when I just read the abstraction of the paper. However, with the help of external tools, it could significantly improve its performance compared with traditional large models, as well.
+\end{document}
